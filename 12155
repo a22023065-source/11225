@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>行程預覽 + 倒數計時</title>
+  <style>
+    :root{
+      --accent:#2b6cb0;
+      --muted:#6b7785;
+      --card-bg:#f4f6f9;
+      --card-border:#e6e9ee;
+      --day-col-gap:40px;
+      font-family: "Segoe UI", Roboto, "Noto Sans TC", "Helvetica Neue", Arial;
+    }
+    body{margin:24px;color:#20303a;background:#fff;}
+    .container{max-width:1100px;margin:0 auto;}
+    h1{font-size:32px;margin:0 0 12px;color:#213042;}
+    .countdown{
+      display:flex;align-items:center;gap:20px;margin-bottom:20px;
+      background:linear-gradient(90deg,#ffffff,#fbfeff);
+      border:1px solid var(--card-border);padding:16px;border-radius:10px;
+      box-shadow:0 4px 18px rgba(20,40,60,0.04);
+    }
+    .countdown .label{font-size:14px;color:var(--muted)}
+    .countdown .value{font-size:20px;color:var(--accent);font-weight:700;}
+    .progress{height:10px;background:#f0f4f8;border-radius:8px;overflow:hidden;flex:1}
+    .progress > i{display:block;height:100%;background:linear-gradient(90deg,#2b6cb0,#6fb3ff);width:0%;}
+    .meta{font-size:13px;color:var(--muted);margin-top:6px;}
+    .itins{display:flex;gap:var(--day-col-gap);flex-wrap:wrap;margin-top:28px;}
+    .day{
+      width:calc(50% - var(--day-col-gap)/2);
+      min-width:260px;
+    }
+    .day h3{margin:0 0 6px;font-size:20px;}
+    .day .date{color:var(--muted);font-size:14px;margin-bottom:12px;}
+    .card{background:var(--card-bg);border:1px solid var(--card-border);padding:12px;border-radius:10px;margin-bottom:12px;
+      box-shadow:0 6px 18px rgba(30,50,80,0.03);}
+    .time{display:inline-block;background:#fff;padding:6px 8px;border-radius:8px;border:1px solid #eceff3;margin-right:10px;color:var(--muted);font-weight:600;}
+    .activity{font-weight:700;color:#123242;}
+    .small{font-size:13px;color:var(--muted);margin-top:6px;}
+    @media (max-width:800px){
+      .day{width:100%}
+      .itins{gap:18px}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>行程預覽</h1>
+
+    <!-- 倒數區塊 -->
+    <div id="countdown" class="countdown" aria-live="polite">
+      <div>
+        <div class="label" id="cd-label">距離出發</div>
+        <div class="value" id="cd-value">載入中...</div>
+        <div class="meta" id="cd-meta">出發：2026/03/18 &nbsp; 結束：2026/03/22</div>
+      </div>
+      <div class="progress" aria-hidden="true" title="旅程進度">
+        <i id="prog-bar" style="width:0%"></i>
+      </div>
+    </div>
+
+    <!-- 行程預覽區（可替換） -->
+    <div class="itins" id="itins">
+      <!-- JS 會注入 days -->
+    </div>
+  </div>
+
+  <script>
+    /*
+      - 修改出發/結束日期：調整 startDateStr 與 endDateStr（YYYY-MM-DD）
+      - 若要倒數到特定時間（如 06:00），設定 startTimeOverride = {hour:6, minute:0}
+      - 本程式使用使用者本機時區計算
+    */
+
+    const startDateStr = '2026-03-18';
+    const endDateStr   = '2026-03-22';
+    const startTimeOverride = null; // or {hour:6, minute:0}
+    const endTimeOverride = {hour:23,minute:59,second:59};
+
+    const itinerary = [
+      {day:1,date:'2026-03-18',items:[
+        {time:'06:00', title:'濟州國際機場'},
+        {time:'07:00', title:'SK Rent–a-Car Billy Car'},
+        {time:'08:00', title:'Audrant Bakery'},
+        {time:'09:00', title:'萬丈窟'},
+        {time:'10:00', title:'Ory Fishmarket'},
+        {time:'11:00', title:'光之地堡'},
+        {time:'12:00', title:'하울1호 1日숙소'}
+      ]},
+      {day:2,date:'2026-03-19',items:[
+        {time:'08:00', title:'牛島王子冰淇淋'},
+        {time:'09:00', title:'CAFE IN UDO'},
+        {time:'10:00', title:'城山日出峰'},
+        {time:'11:00', title:'濟州水上星球'},
+        {time:'12:00', title:'Snoopy Garden'},
+        {time:'13:00', title:'하울1호 1日숙所'}
+      ]},
+      {day:3,date:'2026-03-20',items:[
+        {time:'08:00', title:'하울1호 1日숙所'},
+        {time:'09:00', title:'西歸浦每日偶來市場'},
+        {time:'10:00', title:'Jeju Waterworld'},
+        {time:'11:00', title:'Yeondon'},
+        {time:'12:00', title:'濟州島泰迪熊博物館'},
+        {time:'13:00', title:'濟州樂天酒店'},
+        {time:'14:00', title:'熟成到(中文店)'}
+      ]},
+      {day:4,date:'2026-03-21',items:[
+        {time:'08:00', title:'濟州樂天酒店'},
+        {time:'09:00', title:'山茶花之丘'},
+        {time:'10:00', title:'문소 협재본점'},
+        {time:'11:00', title:'春日咖啡館 BOMNAL'},
+        {time:'12:00', title:'바로족발보쌈'}
+      ]},
+      {day:5,date:'2026-03-22',items:[
+        {time:'08:00', title:'濟州島亂打秀'},
+        {time:'09:00', title:'濟州東門市場'},
+        {time:'10:00', title:'龍頭岩海水汗蒸幕'},
+        {time:'11:00', title:'濟州本館黑豬肉烤肉店'},
+        {time:'12:00', title:'SK Rent–a-Car Billy Car'},
+        {time:'13:00', title:'濟州國際機場'}
+      ]}
+    ];
+
+    function localDateFromYMD(ymdStr, timeOverride){
+      const [y,m,d] = ymdStr.split('-').map(Number);
+      const hr = timeOverride && timeOverride.hour !== undefined ? timeOverride.hour : 0;
+      const mn = timeOverride && timeOverride.minute !== undefined ? timeOverride.minute : 0;
+      const sc = timeOverride && timeOverride.second !== undefined ? timeOverride.second : 0;
+      return new Date(y, m - 1, d, hr, mn, sc, 0);
+    }
+
+    const startDate = localDateFromYMD(startDateStr, startTimeOverride);
+    const endDate   = localDateFromYMD(endDateStr, endTimeOverride);
+
+    document.getElementById('cd-meta').textContent = `出發：${startDateStr} — 結束：${endDateStr}`;
+
+    (function renderItins(){
+      const itinsEl = document.getElementById('itins');
+      itinsEl.innerHTML = '';
+      itinerary.forEach(day=>{
+        const col = document.createElement('div');
+        col.className = 'day';
+        const dtitle = document.createElement('h3');
+        dtitle.textContent = `第 ${day.day} 天`;
+        const dateP = document.createElement('div');
+        dateP.className = 'date';
+        dateP.textContent = `${day.date} ${ ['日','一','二','三','四','五','六'][localDateFromYMD(day.date).getDay()] }`;
+        col.appendChild(dtitle);
+        col.appendChild(dateP);
+        day.items.forEach(it=>{
+          const c = document.createElement('div');
+          c.className = 'card';
+          c.innerHTML = `<div><span class="time"> ${it.time} </span><span class="activity">${it.title}</span></div>`;
+          col.appendChild(c);
+        });
+        itinsEl.appendChild(col);
+      });
+    })();
+
+    function updateCountdown(){
+      const now = new Date();
+      const cdLabel = document.getElementById('cd-label');
+      const cdValue = document.getElementById('cd-value');
+      const progBar = document.getElementById('prog-bar');
+
+      if (now < startDate){
+        cdLabel.textContent = '距離出發還有';
+        const diff = startDate - now;
+        cdValue.textContent = formatDiff(diff);
+        progBar.style.width = '0%';
+      } else if (now >= startDate && now <= endDate){
+        const daysElapsed = Math.floor((now - startDate) / (24*3600*1000)) + 1;
+        cdLabel.textContent = `旅程進行中：第 ${daysElapsed} 天`;
+        const diffEnd = endDate - now;
+        cdValue.textContent = '距離行程結束 ' + formatDiff(diffEnd);
+        const total = endDate - startDate;
+        const passed = now - startDate;
+        const pct = Math.max(0, Math.min(100, (passed/total)*100 ));
+        progBar.style.width = pct.toFixed(2) + '%';
+      } else {
+        cdLabel.textContent = '旅程已結束';
+        cdValue.textContent = '歡迎回來！';
+        progBar.style.width = '100%';
+      }
+    }
+
+    function pad(n){return n<10?('0'+n):n;}
+    function formatDiff(ms){
+      if (ms <= 0) return '0天 00:00:00';
+      const totalSeconds = Math.floor(ms/1000);
+      const days = Math.floor(totalSeconds / 86400);
+      let remain = totalSeconds % 86400;
+      const hours = Math.floor(remain / 3600); remain = remain % 3600;
+      const minutes = Math.floor(remain / 60);
+      const seconds = remain % 60;
+      return `${days}天 ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+  </script>
+</body>
+</html>
